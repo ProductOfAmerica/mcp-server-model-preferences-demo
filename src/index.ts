@@ -3,7 +3,7 @@
  *
  * Reference implementation for SEP: Model Preferences for Tools.
  * Demonstrates how servers can signal model capability preferences
- * per tool using _meta (forward-compatible with proposed annotations).
+ * per tool via _meta on tool definitions (visible in tools/list).
  *
  * Three tools with different complexity profiles:
  *   list_items     — simple list, favors speed/cost
@@ -13,7 +13,7 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { tools } from "./tools.js";
+import { tools, META_KEY } from "./tools.js";
 
 export function createServer(): McpServer {
   const server = new McpServer({
@@ -22,7 +22,18 @@ export function createServer(): McpServer {
   });
 
   for (const tool of tools) {
-    server.tool(tool.name, tool.description, tool.schema, tool.handler);
+    server.registerTool(
+      tool.name,
+      {
+        description: tool.description,
+        inputSchema: tool.schema,
+        annotations: { readOnlyHint: true, openWorldHint: false },
+        _meta: {
+          [META_KEY]: tool.modelPreferences,
+        },
+      },
+      async (args) => tool.handler(args),
+    );
   }
 
   return server;

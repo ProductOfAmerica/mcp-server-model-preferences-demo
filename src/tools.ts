@@ -7,6 +7,9 @@
 
 import { z } from "zod";
 
+/** Namespaced key for model preferences in _meta */
+export const META_KEY = "com.example/model-preferences";
+
 /** Model preference hints (mirrors the proposed ModelPreferences type) */
 export interface ModelPreferencesHint {
   intelligencePriority: number;
@@ -21,7 +24,6 @@ export interface ToolDefinition {
   schema: Record<string, z.ZodType>;
   handler: (args: Record<string, unknown>) => Promise<{
     content: Array<{ type: "text"; text: string }>;
-    _meta: { "com.example/model-preferences": ModelPreferencesHint };
   }>;
   modelPreferences: ModelPreferencesHint;
 }
@@ -52,13 +54,6 @@ const listItems: ToolDefinition = {
         ]),
       },
     ],
-    _meta: {
-      "com.example/model-preferences": {
-        intelligencePriority: 0.1,
-        costPriority: 0.9,
-        speedPriority: 0.8,
-      },
-    },
   }),
 };
 
@@ -94,13 +89,6 @@ const summarizeData: ToolDefinition = {
         }),
       },
     ],
-    _meta: {
-      "com.example/model-preferences": {
-        intelligencePriority: 0.5,
-        costPriority: 0.5,
-        speedPriority: 0.5,
-      },
-    },
   }),
 };
 
@@ -174,13 +162,6 @@ const deepAnalysis: ToolDefinition = {
         }),
       },
     ],
-    _meta: {
-      "com.example/model-preferences": {
-        intelligencePriority: 0.9,
-        costPriority: 0.2,
-        speedPriority: 0.3,
-      },
-    },
   }),
 };
 

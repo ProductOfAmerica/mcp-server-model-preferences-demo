@@ -1,7 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { tools, type ModelPreferencesHint } from "../../src/tools.js";
-
-const META_KEY = "com.example/model-preferences";
+import { tools } from "../../src/tools.js";
 
 function isValidPriority(n: number): boolean {
   return typeof n === "number" && n >= 0 && n <= 1;
@@ -52,25 +50,6 @@ describe("tool handlers", () => {
       it("returns parseable JSON content", async () => {
         const result = await tool.handler({});
         expect(() => JSON.parse(result.content[0].text)).not.toThrow();
-      });
-
-      it("returns _meta with model preferences", async () => {
-        const result = await tool.handler({});
-        const prefs = result._meta[META_KEY];
-        expect(prefs).toBeDefined();
-        expect(isValidPriority(prefs.intelligencePriority)).toBe(true);
-        expect(isValidPriority(prefs.costPriority)).toBe(true);
-        expect(isValidPriority(prefs.speedPriority)).toBe(true);
-      });
-
-      it("handler _meta matches definition modelPreferences", async () => {
-        const result = await tool.handler({});
-        const prefs = result._meta[META_KEY];
-        expect(prefs.intelligencePriority).toBe(
-          tool.modelPreferences.intelligencePriority,
-        );
-        expect(prefs.costPriority).toBe(tool.modelPreferences.costPriority);
-        expect(prefs.speedPriority).toBe(tool.modelPreferences.speedPriority);
       });
     });
   }

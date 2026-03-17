@@ -2,8 +2,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createServer } from "../../src/index.js";
-
-const META_KEY = "com.example/model-preferences";
+import { META_KEY } from "../../src/tools.js";
 
 describe("MCP server via InMemoryTransport", () => {
   let client: Client;
@@ -65,6 +64,14 @@ describe("MCP server via InMemoryTransport", () => {
       const { tools } = await client.listTools();
       const names = tools.map((t) => t.name).sort();
       expect(names).toEqual(["deep_analysis", "list_items", "summarize_data"]);
+    });
+
+    it("each tool has annotations", async () => {
+      const { tools } = await client.listTools();
+      for (const tool of tools) {
+        expect(tool.annotations?.readOnlyHint).toBe(true);
+        expect(tool.annotations?.openWorldHint).toBe(false);
+      }
     });
   });
 
@@ -163,47 +170,64 @@ describe("MCP server via InMemoryTransport", () => {
   });
 
   // --------------------------------------------------------------------------
-  // Model preferences in _meta
+  // Model preferences on tool definitions (tools/list _meta)
   // --------------------------------------------------------------------------
 
-  describe("model preferences via _meta", () => {
-    it("list_items result includes model preferences", async () => {
-      const result = await client.callTool({
-        name: "list_items",
-        arguments: {},
-      });
-      const meta = result._meta as Record<string, unknown> | undefined;
-      expect(meta).toBeDefined();
-      const prefs = meta![META_KEY] as Record<string, number>;
+  describe("model preferences on tool definitions", () => {
+    it("each tool definition includes _meta with model preferences", async () => {
+      const { tools } = await client.listTools();
+      for (const tool of tools) {
+        const meta = tool._meta as Record<string, unknown> | undefined;
+        expect(meta).toBeDefined();
+        expect(meta![META_KEY]).toBeDefined();
+      }
+    });
+
+    it("list_items definition has cost/speed-optimized preferences", async () => {
+      const { tools } = await client.listTools();
+      const tool = tools.find((t) => t.name === "list_items")!;
+      const prefs = (tool._meta as Record<string, Record<string, number>>)[META_KEY];
       expect(prefs.intelligencePriority).toBe(0.1);
       expect(prefs.costPriority).toBe(0.9);
       expect(prefs.speedPriority).toBe(0.8);
     });
 
-    it("summarize_data result includes balanced preferences", async () => {
-      const result = await client.callTool({
-        name: "summarize_data",
-        arguments: { dataset: "test" },
-      });
-      const meta = result._meta as Record<string, unknown> | undefined;
-      expect(meta).toBeDefined();
-      const prefs = meta![META_KEY] as Record<string, number>;
+    it("summarize_data definition has balanced preferences", async () => {
+      const { tools } = await client.listTools();
+      const tool = tools.find((t) => t.name === "summarize_data")!;
+      const prefs = (tool._meta as Record<string, Record<string, number>>)[META_KEY];
       expect(prefs.intelligencePriority).toBe(0.5);
       expect(prefs.costPriority).toBe(0.5);
       expect(prefs.speedPriority).toBe(0.5);
     });
 
-    it("deep_analysis result includes high intelligence preference", async () => {
-      const result = await client.callTool({
-        name: "deep_analysis",
-        arguments: { subject: "test" },
-      });
-      const meta = result._meta as Record<string, unknown> | undefined;
-      expect(meta).toBeDefined();
-      const prefs = meta![META_KEY] as Record<string, number>;
+    it("deep_analysis definition has high intelligence preference", async () => {
+      const { tools } = await client.listTools();
+      const tool = tools.find((t) => t.name === "deep_analysis")!;
+      const prefs = (tool._meta as Record<string, Record<string, number>>)[META_KEY];
       expect(prefs.intelligencePriority).toBe(0.9);
       expect(prefs.costPriority).toBe(0.2);
       expect(prefs.speedPriority).toBe(0.3);
+    });
+
+    it("preferences are available before calling any tool", async () => {
+      // This is the key test: clients can route models based on
+      // tool definitions without making a single tool call first
+      const { tools } = await client.listTools();
+      const prefsMap = new Map(
+        tools.map((t) => [
+          t.name,
+          (t._meta as Record<string, Record<string, number>>)[META_KEY],
+        ]),
+      );
+
+      // A client could use this to decide: use Haiku for list_items, Opus for deep_analysis
+      expect(prefsMap.get("list_items")!.costPriority).toBeGreaterThan(
+        prefsMap.get("deep_analysis")!.costPriority,
+      );
+      expect(prefsMap.get("deep_analysis")!.intelligencePriority).toBeGreaterThan(
+        prefsMap.get("list_items")!.intelligencePriority,
+      );
     });
   });
 });

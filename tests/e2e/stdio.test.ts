@@ -1,8 +1,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-
-const META_KEY = "com.example/model-preferences";
+import { META_KEY } from "../../src/tools.js";
 
 describe("MCP server via stdio (E2E)", () => {
   let client: Client;
@@ -36,6 +35,14 @@ describe("MCP server via stdio (E2E)", () => {
     expect(names).toEqual(["deep_analysis", "list_items", "summarize_data"]);
   });
 
+  it("tool definitions include model preferences in _meta", async () => {
+    const { tools } = await client.listTools();
+    const deepAnalysis = tools.find((t) => t.name === "deep_analysis")!;
+    const meta = deepAnalysis._meta as Record<string, Record<string, number>>;
+    expect(meta).toBeDefined();
+    expect(meta[META_KEY].intelligencePriority).toBe(0.9);
+  });
+
   it("calls list_items and returns valid response", async () => {
     const result = await client.callTool({
       name: "list_items",
@@ -45,19 +52,6 @@ describe("MCP server via stdio (E2E)", () => {
     const text = (result.content[0] as { type: string; text: string }).text;
     const parsed = JSON.parse(text);
     expect(Array.isArray(parsed)).toBe(true);
-  });
-
-  it("calls deep_analysis and returns model preferences in _meta", async () => {
-    const result = await client.callTool({
-      name: "deep_analysis",
-      arguments: { subject: "soil health" },
-    });
-    expect(result.isError).toBeFalsy();
-
-    const meta = result._meta as Record<string, unknown> | undefined;
-    expect(meta).toBeDefined();
-    const prefs = meta![META_KEY] as Record<string, number>;
-    expect(prefs.intelligencePriority).toBe(0.9);
   });
 
   it("server process exits cleanly when client disconnects", async () => {
